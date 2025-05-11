@@ -1,5 +1,6 @@
 # app.py
 from flask import Flask, request, jsonify, session, abort
+import os
 import base64
 import datetime
 import jwt  # PyJWT
@@ -100,5 +101,6 @@ def index():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+    PORT = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=PORT)
 
