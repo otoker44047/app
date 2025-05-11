@@ -79,7 +79,8 @@ def check_auth(auth_header):
     parts = decoded.split(":", 1)
     if len(parts) != 2:
         return False
-    return True
+    user, pw = parts
+    return user == USERNAME and pw == PASSWORD
 
 #
 # ————————————————
