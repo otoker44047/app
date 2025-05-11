@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, request, jsonify, session, abort
+from flask import Flask, request, jsonify, session, abort, Response
 import os
 import base64
 import datetime
@@ -54,6 +54,32 @@ def login_jwt():
         return jsonify(token=token), 200
     return abort(401)
 
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+        "Authentication required\n", 
+        401,
+        {"WWW-Authenticate": 'Basic realm="CNS Judge"'}
+    )
+
+def check_auth(auth_header):
+    """
+    Returns True if the Authorization header is valid.
+    auth_header is the raw header string, e.g. 'Basic QWxhZGRpbjpPcGVuU2VzYW1l'
+    """
+    if not auth_header or not auth_header.startswith("Basic "):
+        return False
+    # strip off "Basic "
+    b64 = auth_header.split(" ", 1)[1]
+    try:
+        decoded = base64.b64decode(b64).decode("utf-8")
+    except Exception:
+        return False
+    # Expect format username:password
+    parts = decoded.split(":", 1)
+    if len(parts) != 2:
+        return False
+    return True
 
 #
 # ————————————————
@@ -70,35 +96,11 @@ def index():
         return f"Hello {session['username']} (cookie)", 200
 
     # read Authorization header
-    auth = request.headers.get('Authorization', '')
-    parts = auth.split(' ', 1)
-
-    # B) Basic
-    if len(parts) == 2 and parts[0] == 'Basic':
-        try:
-            decoded = base64.b64decode(parts[1]).decode('utf-8')
-            user, pw = decoded.split(':', 1)
-        except Exception:
-            return abort(401)
-        if user == USERNAME and pw == PASSWORD:
-            return f"Hello {user} (basic)", 200
-        return abort(401)
-
-    # C) Bearer / JWT
-    if len(parts) == 2 and parts[0] == 'Bearer':
-        token = parts[1]
-        try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-            user = payload.get('username')
-            return f"Hello {user} (jwt)", 200
-        except jwt.ExpiredSignatureError:
-            return abort(401)
-        except jwt.InvalidTokenError:
-            return abort(401)
-
-    # no valid auth
-    return abort(401)
-
+    auth_header = request.headers.get('Authorization', None)
+    if not check_auth(auth_header):
+        return authenticate()
+    return "OK\n", 200
+    
 
 if __name__ == '__main__':
     PORT = int(os.environ.get("PORT", 10000))
