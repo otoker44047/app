@@ -148,27 +148,50 @@ def universal_login():
     
 
 # --- PATCH the protected resource -------------------------------------------
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "POST"])
 def index():
     # a) Cookie/session check  (subtask b)
-    if session.get("authenticated"):
-        return f"Hello {session['username']} (cookie)\n", 200
+    if request.method == "GET":
+        if session.get("authenticated"):
+            return f"Hello {session['username']} (cookie)\n", 200
 
-    # b) JWT Bearer check      (subtask c)
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        try:
-            jwt.decode(auth[7:], JWT_SECRET, algorithms=["HS256"])
-            return "Hello JWT user\n", 200
-        except jwt.PyJWTError:
-            pass  # fall through → 401
+        # b) JWT Bearer check      (subtask c)
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                jwt.decode(auth[7:], JWT_SECRET, algorithms=["HS256"])
+                return "Hello JWT user\n", 200
+            except jwt.PyJWTError:
+                pass  # fall through → 401
 
-    # c) HTTP Basic check      (subtask a)
-    if check_auth(auth):
-        return "Hello Basic user\n", 200
+        # c) HTTP Basic check      (subtask a)
+        if check_auth(auth):
+            return "Hello Basic user\n", 200
 
-    # Otherwise request auth
-    return authenticate()
+        # Otherwise request auth
+        return authenticate()
+    elif request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        user = body.get("username")
+        pw = body.get("password")
+
+        if user is None and request.headers.get("Authorization", "").startswith("Basic "):
+            user, pw = _extract_basic_credentials(request)
+        if user == USERNAME and pw == PASSWORD:
+            session.clear()
+            session["authenticated"] = True
+            session["username"] = user
+
+            payload = {
+                    "username": USERNAME,
+                    "iat": datetime.datetime.utcnow(),
+                    "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+            }
+            token = jwt.encode(payload, JWT_SECRET, alrogithm="HS256")
+            resp = jsonify(token=token)
+            return resp, 200
+        return abort(401)
+
 
 
 if __name__ == '__main__':
