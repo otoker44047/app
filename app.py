@@ -13,8 +13,8 @@ app = Flask(__name__)
 # ————————————————
 app.secret_key = 'replace_with_a_real_secret_key'      # for Flask sessions
 JWT_SECRET    = 'replace_with_a_real_jwt_secret'
-USERNAME      = 'user'
-PASSWORD      = 'password'
+USERNAME      = 'CNS-user'
+PASSWORD      = 'CNS-password'
 
 # make session cookies HttpOnly
 app.config.update(
