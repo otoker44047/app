@@ -68,6 +68,7 @@ def _extract_basic_credentials(req):
 @app.route("/", methods=["GET", "POST"])
 def index():
     # a) Cookie/session check  (subtask b)
+    print(f'request = {request}')
     if request.method == "GET":
         if session.get("authenticated"):
             return f"Hello {session['username']} (cookie)\n", 200
@@ -75,8 +76,9 @@ def index():
         # b) JWT Bearer check      (subtask c)
         auth = request.headers.get("Authorization", "")
         if auth.startswith("Bearer "):
+            token = auth[7:].strip()
             try:
-                jwt.decode(auth[7:], JWT_SECRET, algorithms=["HS256"])
+                jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
                 return "Hello JWT user\n", 200
             except jwt.PyJWTError:
                 pass  # fall through → 401
@@ -120,7 +122,6 @@ def index():
                     "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
             }
             token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-            resp = jsonify(token=token)
             return token, 200, {"Content-Type": "text/plain"}
             #return resp, 200
         return abort(401)
