@@ -124,9 +124,7 @@ def index():
             token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
             return token, 200, {"Content-Type": "text/plain"}
             #return resp, 200
-        return abort(401)
-
-    return "", 200
+    return authenticate()
 
 @app.before_request
 def dbg():
