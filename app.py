@@ -22,38 +22,6 @@ app.config.update(
     SESSION_COOKIE_SECURE=False    # set True if you deploy over HTTPS
 )
 
-
-#
-# ————————————————
-# 1) Cookie‐based login
-# ————————————————
-# @app.route('/login', methods=['POST'])
-# def login_cookie():
-#     data = request.get_json() or {}
-#     if data.get('username') == USERNAME and data.get('password') == PASSWORD:
-#         session.clear()
-#         session['authenticated'] = True
-#         session['username']      = USERNAME
-#         return '', 200
-#     return abort(401)
-#
-#
-# #
-# # ————————————————
-# # 2) JWT‐based login
-# # ————————————————
-# @app.route('/login-jwt', methods=['POST'])
-# def login_jwt():
-#     data = request.get_json() or {}
-#     if data.get('username') == USERNAME and data.get('password') == PASSWORD:
-#         payload = {
-#             'username': USERNAME,
-#             'exp':      datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-#         }
-#         token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-#         return jsonify(token=token), 200
-#     return abort(401)
-#
 def authenticate():
     """Sends a 401 response that enables basic auth"""
     return Response(
@@ -81,26 +49,6 @@ def check_auth(auth_header):
         return False
     user, pw = parts
     return user == USERNAME and pw == PASSWORD
-#
-# #
-# # ————————————————
-# # 3) Protected root “/”
-# #    accepts any of:
-# #      • valid Flask session cookie
-# #      • Basic auth header
-# #      • Bearer (JWT) header
-# # ————————————————
-# @app.route('/', methods=['GET'])
-# def index():
-#     # A) cookie/session
-#     if session.get('authenticated'):
-#         return f"Hello {session['username']} (cookie)", 200
-#
-#     # read Authorization header
-#     auth_header = request.headers.get('Authorization', None)
-#     if not check_auth(auth_header):
-#         return authenticate()
-#     return "OK\n", 200
 
 
 # --- NEW helper --------------------------------------------------------------
@@ -114,37 +62,6 @@ def _extract_basic_credentials(req):
         except Exception:
             pass
     return (None, None)
-
-# --- REPLACE all /login* routes by ONE universal /login ----------------------
-@app.route("/login", methods=["GET", "POST"])
-def universal_login():
-    # 1️⃣ Accept either Basic-Auth header **or** JSON body
-    user, pw = _extract_basic_credentials(request)
-    if user is None:               # fall back to JSON
-        data = request.get_json(silent=True) or {}
-        user, pw = data.get("username"), data.get("password")
-
-    if user != USERNAME or pw != PASSWORD:
-        return abort(401)
-
-    # 2️⃣ COOKIE branch – always create a session
-    session.clear()
-    session["authenticated"] = True
-    session["username"]      = USERNAME
-
-    # 3️⃣ JWT branch – always create a token (subtask “c” will read it)
-    payload = {
-        "username": USERNAME,
-        "iat": datetime.datetime.utcnow(),
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-
-    # 4️⃣ Single unified response
-    # • Sets Flask session cookie (for subtask b)  
-    # • Returns JSON with token (for subtask c)
-    return jsonify(token=token), 200
-
     
 
 # --- PATCH the protected resource -------------------------------------------
@@ -177,6 +94,10 @@ def index():
 
         if user is None and request.headers.get("Authorization", "").startswith("Basic "):
             user, pw = _extract_basic_credentials(request)
+
+        if not user:
+            user, pw = request.form.get("username"), request.form.get("password")
+
         if user == USERNAME and pw == PASSWORD:
             session.clear()
             session["authenticated"] = True
@@ -187,12 +108,14 @@ def index():
                     "iat": datetime.datetime.utcnow(),
                     "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
             }
-            token = jwt.encode(payload, JWT_SECRET, alrogithm="HS256")
+            token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
             resp = jsonify(token=token)
             return resp, 200
         return abort(401)
 
-
+@app.before_request
+def dbg():
+    print(request.method, request.path, dict(request.headers))
 
 if __name__ == '__main__':
     PORT = int(os.environ.get("PORT", 10000))
