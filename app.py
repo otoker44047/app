@@ -81,6 +81,17 @@ def index():
             except jwt.PyJWTError:
                 pass  # fall through → 401
 
+        if auth.startswith("Basic "):
+            u, p = _extract_basic_credentials(request)
+            if u == USERNAME and p == PASSWORD:
+                payload = {
+                        "username": USERNAME,
+                        "iat": datetime.datetime.utcnow(),
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+                }
+                token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+                return token, 200, {"Content-Type": "text/plain"}
+
         # c) HTTP Basic check      (subtask a)
         if check_auth(auth):
             return "Hello Basic user\n", 200
